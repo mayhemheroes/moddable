@@ -1,0 +1,5 @@
+project: rnshah9/moddable
+target: bles2gatt
+
+cmds:
+  - cmd: /repo/build/bin/lin/release/tools bles2gatt @@
