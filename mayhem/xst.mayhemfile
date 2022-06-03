@@ -1,0 +1,4 @@
+project: PROJECT
+target: xst
+cmds:
+- cmd: /out/xst
