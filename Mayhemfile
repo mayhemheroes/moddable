@@ -2,4 +2,4 @@ project: moddable
 target: tools
 
 cmds:
-  - cmd: /repo/build/bin/lin/release/tools bles2gatt @@
+  - cmd: /tools bles2gatt @@
