@@ -1480,18 +1480,23 @@ void fxAwaitImport(txMachine* the, txBoolean defaultFlag)
 			stack->value.boolean = moduleID != XS_NO_ID;
 		}
 		else {
-			fxRunImportNow(the, realm, XS_NO_ID);
-			if (defaultFlag) {
-				defaultID = mxID(_default);
-				export = mxModuleExports(stack)->value.reference->next;
-				while (export) {
-					mxCheck(the, export->kind == XS_EXPORT_KIND);
-					if (export->ID == defaultID) {
-						stack->kind = export->value.export.closure->kind;
-						stack->value = export->value.export.closure->value;
-						break;
+			if (defaultFlag & XS_IMPORT_ASYNC) {
+				gxDefaults.runImport(the, realm, XS_NO_ID);
+			}
+			else {
+				fxRunImportNow(the, realm, XS_NO_ID);
+				if (defaultFlag & XS_IMPORT_DEFAULT) {
+					defaultID = mxID(_default);
+					export = mxModuleExports(stack)->value.reference->next;
+					while (export) {
+						mxCheck(the, export->kind == XS_EXPORT_KIND);
+						if (export->ID == defaultID) {
+							stack->kind = export->value.export.closure->kind;
+							stack->value = export->value.export.closure->value;
+							break;
+						}
+						export = export->next;
 					}
-					export = export->next;
 				}
 			}
 		}
@@ -1901,7 +1906,7 @@ void fx_Compartment(txMachine* the)
 	txSlot* global = C_NULL;
 	txSlot* closures = C_NULL;
 	txSlot* slot;
-	txSlot* own;
+//	txSlot* own;
 	txInteger id;
 	
 	if (!module) module = mxProgram.value.reference;
@@ -2002,7 +2007,7 @@ void fx_Compartment(txMachine* the)
 			txSlot* at;
 			txSlot* property;
 			target = fxNewInstance(the);
-			own = fxNewInstance(the);
+			/* own = */ fxNewInstance(the);
 			mxPushSlot(mxArgv(1));
 			source = fxToInstance(the, the->stack);
 			at = fxNewInstance(the);
@@ -2367,7 +2372,7 @@ void fx_StaticModuleRecord(txMachine* the)
 		script.symbolsBuffer = NULL;
 		script.symbolsSize = 0;
 		script.codeBuffer = code;
-		script.codeSize = size;
+		script.codeSize = (txSize)size;
 		script.hostsBuffer = NULL;
 		script.hostsSize = 0;
 		script.path = path;

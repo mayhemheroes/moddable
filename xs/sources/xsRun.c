@@ -56,7 +56,6 @@ static void fxRunIn(txMachine* the);
 static void fxRunInstantiate(txMachine* the);
 static void fxRunProxy(txMachine* the, txSlot* instance);
 static void fxRunInstanceOf(txMachine* the);
-static txBoolean fxIsSameReference(txMachine* the, txSlot* a, txSlot* b);
 static txBoolean fxIsScopableSlot(txMachine* the, txSlot* instance, txID id);
 static txBoolean fxToNumericInteger(txMachine* the, txSlot* theSlot);
 static txBoolean fxToNumericIntegerUnary(txMachine* the, txSlot* theSlot, txBigIntUnary op);
@@ -500,6 +499,8 @@ void fxRunID(txMachine* the, txSlot* generator, txInteger count)
 		&&XS_CODE_GET_VARIABLE,
 		&&XS_CODE_GET_THIS_VARIABLE,
 		&&XS_CODE_GLOBAL,
+		&&XS_CODE_HAS_PRIVATE_1,
+		&&XS_CODE_HAS_PRIVATE_2,
 		&&XS_CODE_HOST,
 		&&XS_CODE_IMPORT,
 		&&XS_CODE_IMPORT_META,
@@ -828,7 +829,7 @@ XS_CODE_JUMP:
 						mxFrame = mxStack + 1 + offset + 1;
 						mxFrame->flag |= XS_C_FLAG;
 						mxScope = mxStack;
-						mxCode = (txByte*)slot->value.callback.IDs;
+						mxCode = C_NULL;
 						byte = XS_CODE_CALL;
 						mxSaveState;
 			#ifdef mxLink
@@ -881,7 +882,7 @@ XS_CODE_JUMP:
 				mxFrame = mxStack + 1 + offset + 1;
 				mxFrame->flag |= XS_C_FLAG;
 				mxScope = mxStack;
-				mxCode = (txByte*)slot->value.hostFunction.IDs;
+				mxCode = C_NULL;
 				byte = XS_CODE_CALL;
 				mxSaveState;
 #ifdef mxLink
@@ -2184,7 +2185,6 @@ XS_CODE_JUMP:
 				mxRunDebugID(XS_TYPE_ERROR, "get super %s: no prototype", (txID)offset);
 			slot = mxBehaviorGetProperty(the, slot, (txID)offset, index, XS_ANY);
 			goto XS_CODE_GET_ALL;
-			
 		mxCase(XS_CODE_GET_PRIVATE_2)
 			index = mxRunU2(1);
 			mxNextCode(3);
@@ -2439,6 +2439,31 @@ XS_CODE_JUMP:
 			mxStack++;
 			mxBreak;
 			
+		mxCase(XS_CODE_HAS_PRIVATE_2)
+			index = mxRunU2(1);
+			mxNextCode(3);
+			goto XS_CODE_HAS_PRIVATE;
+		mxCase(XS_CODE_HAS_PRIVATE_1)
+			index = mxRunU1(1);
+			mxNextCode(2);
+		XS_CODE_HAS_PRIVATE:
+#ifdef mxTrace
+			if (gxDoTrace) fxTraceIndex(the, index - 1);
+#endif
+			slot = (mxEnvironment - index);
+			if (mxStack->kind == XS_REFERENCE_KIND)
+				variable = mxStack->value.reference; 
+			else
+				mxRunDebug(XS_TYPE_ERROR, "in: no instance");
+			offset = slot->ID;
+			index = 0;
+			if (slot->value.closure->kind < 0)
+				mxRunDebugID(XS_TYPE_ERROR, "get %s: undefined private property", (txID)offset);
+			slot = gxDefaults.getPrivateProperty(the, variable, slot->value.closure->value.reference, (txID)offset);
+			mxStack->kind = XS_BOOLEAN_KIND;
+			mxStack->value.boolean = (slot) ? 1 : 0;
+			mxBreak;
+						
 	/* INSTANCES */	
 		mxCase(XS_CODE_ARRAY)
 // 			mxAllocStack(1);
@@ -2576,6 +2601,8 @@ XS_CODE_JUMP:
 			mxNextCode(1);
 			variable = mxStack->value.reference;
 			slot = mxBehaviorGetProperty(the, variable, mxID(_raw), 0, XS_OWN);
+            if (!slot)
+				mxRunDebug(XS_TYPE_ERROR, "template: no raw");
 			variable->flag |= XS_DONT_PATCH_FLAG;
 			variable->next->flag |= XS_DONT_SET_FLAG;
 			slot->flag |= XS_DONT_DELETE_FLAG | XS_DONT_ENUM_FLAG | XS_DONT_SET_FLAG;
@@ -3355,6 +3382,23 @@ XS_CODE_JUMP:
 			slot = mxStack + 1;
 			if (slot->kind == XS_INTEGER_KIND) {
 				if (mxStack->kind == XS_INTEGER_KIND) {
+				#ifdef mxMinusZero
+					if (slot->value.integer == 0) {
+						if (mxStack->value.integer < 0) {
+							slot->kind = XS_NUMBER_KIND;
+							slot->value.number = -0.0;
+						}
+					}
+					else if (mxStack->value.integer == 0) {
+						if (slot->value.integer < 0) {
+							slot->kind = XS_NUMBER_KIND;
+							slot->value.number = -0.0;
+						}
+						else
+							slot->value.integer = 0;
+					}
+					else {
+				#endif
 					#if __has_builtin(__builtin_mul_overflow)
 						if (__builtin_mul_overflow(slot->value.integer, mxStack->value.integer, &scratch.value.integer)) {
 							slot->kind = XS_NUMBER_KIND;
@@ -3366,6 +3410,9 @@ XS_CODE_JUMP:
 						slot->kind = XS_NUMBER_KIND;
 						slot->value.number = (txNumber)(slot->value.integer) * (txNumber)(mxStack->value.integer);
 					#endif
+				#ifdef mxMinusZero
+					}
+				#endif
 				}
 				else if (mxStack->kind == XS_NUMBER_KIND) {
 					slot->kind = XS_NUMBER_KIND;
@@ -3405,16 +3452,15 @@ XS_CODE_JUMP:
 						slot->kind = XS_NUMBER_KIND;
 						slot->value.number = C_NAN;
 					}
-#if mxIntegerDivideOverflowException
-					else if ((mxStack->value.integer == 1) || (mxStack->value.integer == -1)) {
-						if (slot->value.integer >= 0)
-							slot->value.integer = 0;
-						else {
+				#ifdef mxMinusZero
+					else if (slot->value.integer < 0) {
+						slot->value.integer %= mxStack->value.integer;
+						if (slot->value.integer == 0) {
 							slot->kind = XS_NUMBER_KIND;
 							slot->value.number = -0.0;
 						}
 					}
-#endif
+				#endif
 					else
 						slot->value.integer %= mxStack->value.integer;
 				}
@@ -4719,6 +4765,7 @@ void fxRunScript(txMachine* the, txScript* script, txSlot* _this, txSlot* _targe
 					p += mxStringLength((char*)p) + 1;
 				}
 				fxRemapIDs(the, script->codeBuffer, script->codeSize, the->stack->value.callback.IDs);
+				the->stack->value.callback.IDs = C_NULL;
 			}	
 			else {
 				the->stack->value.callback.address = C_NULL;
@@ -4738,7 +4785,7 @@ void fxRunScript(txMachine* the, txScript* script, txSlot* _this, txSlot* _targe
 				instance = fxNewFunctionInstance(the, closures ? mxID(_eval) : XS_NO_ID);
 				instance->next->kind = XS_CALLBACK_KIND;
 				instance->next->value.callback.address = script->callback;
-				instance->next->value.callback.IDs = property->value.callback.IDs;
+				instance->next->value.callback.IDs = C_NULL;
 				property = mxFunctionInstanceHome(instance);
 				property->value.home.object = object;
 				property->value.home.module = module;

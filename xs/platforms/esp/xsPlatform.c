@@ -987,11 +987,6 @@ void fxConnectTo(txMachine *the, struct tcp_pcb *pcb)
 	the->connection = pcb;
 }
 
-static void doLoadModule(modTimer timer, void *refcon, int refconSize)
-{
-	modLoadModule((txMachine *)*(uintptr_t *)refcon, sizeof(uintptr_t) + (uint8_t *)refcon);
-}
-
 void doRemoteCommand(txMachine *the, uint8_t *cmd, uint32_t cmdLen)
 {
 	uint16_t resultID = 0;
@@ -1113,15 +1108,12 @@ void doRemoteCommand(txMachine *the, uint8_t *cmd, uint32_t cmdLen)
 					break;
 				}
 
-				uint8_t buffer[65];
-				uint8_t type;
+				uint8_t *buffer = the->echoBuffer + the->echoOffset;
 				uint16_t byteCountOut;
-				if (!modPreferenceGet(domain, key, &buffer[0], buffer + 1, sizeof(buffer), &byteCountOut))
+				if (!modPreferenceGet(domain, key, buffer, buffer + 1, sizeof(the->echoBuffer) - (the->echoOffset + 1), &byteCountOut))
 					resultCode = -1;
-				else {
-					c_memcpy(the->echoBuffer + the->echoOffset, buffer, byteCountOut + 1);
+				else
 					the->echoOffset += byteCountOut + 1;
-				}
 			}
 		}
 		break;
@@ -1140,20 +1132,6 @@ void doRemoteCommand(txMachine *the, uint8_t *cmd, uint32_t cmdLen)
 				modSetDaylightSavingsOffset(c_read32be(cmd + 8));
 #endif
 			break;
-
-		case 10: {
-				uintptr_t bytes[16];
-				bytes[0] = (uintptr_t)the;
-				if (cmdLen > (sizeof(uintptr_t) * 15)) {
-					resultCode = -1;
-					goto bail;
-				}
-
-				c_strcpy((void *)(bytes + 1), cmd);
-				modTimerAdd(0, 0, doLoadModule, bytes, cmdLen + sizeof(uintptr_t));
-			}
-			break;
-
 
 		case 11:
 			the->echoBuffer[the->echoOffset++] = XS_MAJOR_VERSION;

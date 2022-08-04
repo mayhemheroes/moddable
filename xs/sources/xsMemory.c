@@ -232,7 +232,9 @@ void* fxCheckChunk(txMachine* the, txChunk* chunk, txSize size, txSize offset)
 #else
 		txSize capacity = (txSize)(chunk->temporary - data);
 	#ifdef mxSnapshot
-		chunk->dummy = 0;
+		#if INTPTR_MAX == INT64_MAX
+			chunk->dummy = 0;
+		#endif
 	#ifdef mxSnapshotRandomInit
 		arc4random_buf(data + sizeof(txChunk), offset);
 	#endif		
@@ -255,9 +257,9 @@ void fxCheckCStack(txMachine* the)
 {
     char x;
     char *stack = &x;
-    if (stack <= the->stackLimit) {
-    	fxAbort(the, XS_STACK_OVERFLOW_EXIT);
-    }
+	if (stack <= the->stackLimit) {
+		fxAbort(the, XS_STACK_OVERFLOW_EXIT);
+	}
 }
 
 void fxCollect(txMachine* the, txBoolean theFlag)
@@ -866,6 +868,7 @@ void fxMarkReference(txMachine* the, txSlot* theSlot)
 		break;
 	case XS_MODULE_KIND:
 	case XS_PROGRAM_KIND:
+		fxCheckCStack(the);
 		aSlot = theSlot->value.module.realm;
 		if (aSlot && !(aSlot->flag & XS_MARK_FLAG))
 			fxMarkInstance(the, aSlot, fxMarkReference);
@@ -1242,8 +1245,9 @@ void fxMarkWeakStuff(txMachine* the)
 				txSlot** listEntryAddress = &list->value.weakList.first;
 				while ((listEntry = *listEntryAddress)) {
 					txSlot* value = listEntry->value.weakEntry.value;
-					if (value->flag & XS_MARK_FLAG)
+					if ((value->flag & XS_MARK_FLAG) && (value->kind != XS_UNINITIALIZED_KIND)) {
 						listEntryAddress = &listEntry->next;
+					}
 					else {
 						listEntry->flag &= ~XS_MARK_FLAG;
 						*listEntryAddress = listEntry->next;

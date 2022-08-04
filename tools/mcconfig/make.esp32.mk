@@ -22,6 +22,9 @@ HOST_OS := $(shell uname)
 UPLOAD_SPEED ?= 921600
 DEBUGGER_SPEED ?= 460800
 
+XSBUG_HOST ?= localhost
+XSBUG_PORT ?= 5002
+
 EXPECTED_ESP_IDF ?= v4.4
 
 # ESP32_SUBCLASS is to find some include files in IDFv4
@@ -29,10 +32,12 @@ EXPECTED_ESP_IDF ?= v4.4
 ESP32_SUBCLASS ?= esp32
 # $(warning ESP32_SUBCLASS $(ESP32_SUBCLASS))
 
-ifeq ($(ESP32_SUBCLASS),"esp32c3")
+ifeq ("$(ESP32_SUBCLASS)","esp32c3")
 	ESP_ARCH = riscv
+	GXX_PREFIX = riscv32-esp
 else
 	ESP_ARCH = xtensa
+	GXX_PREFIX = xtensa-$(ESP32_SUBCLASS)
 endif
 
 ifeq ($(VERBOSE),1)
@@ -64,7 +69,9 @@ ifeq ($(MAKEFLAGS_JOBS),)
 endif
 
 SDKCONFIG_H_DIR = $(BLD_DIR)/config
-
+ifeq ("$(ESP32_SUBCLASS)","esp32c3")
+	ESP32_TARGET = 4
+else
 ifeq ("$(ESP32_SUBCLASS)","esp32s3")
 	ESP32_TARGET = 3
 else
@@ -74,7 +81,7 @@ else
 		ESP32_TARGET = 1
 	endif
 endif
-
+endif
 
 INC_DIRS = \
  	$(IDF_PATH)/components \
@@ -93,6 +100,7 @@ INC_DIRS = \
  	$(IDF_PATH)/components/esp_event/include \
  	$(IDF_PATH)/components/esp_eth/include \
  	$(IDF_PATH)/components/esp_hw_support/include \
+ 	$(IDF_PATH)/components/esp_hw_support/include/soc \
  	$(IDF_PATH)/components/esp_netif/include \
  	$(IDF_PATH)/components/esp_pm/include \
  	$(IDF_PATH)/components/esp_ringbuf/include \
@@ -101,8 +109,8 @@ INC_DIRS = \
  	$(IDF_PATH)/components/esp_system/include \
  	$(IDF_PATH)/components/esp_timer/include \
  	$(IDF_PATH)/components/esp_wifi/include \
- 	$(IDF_PATH)/components/xtensa/include \
-	$(IDF_PATH)/components/xtensa/$(ESP32_SUBCLASS)/include \
+ 	$(IDF_PATH)/components/$(ESP_ARCH)/include \
+	$(IDF_PATH)/components/$(ESP_ARCH)/$(ESP32_SUBCLASS)/include \
  	$(IDF_PATH)/components/freertos \
  	$(IDF_PATH)/components/freertos/include \
  	$(IDF_PATH)/components/freertos/include/freertos \
@@ -133,7 +141,9 @@ INC_DIRS = \
  	$(IDF_PATH)/components/bt/host/nimble/nimble/porting/nimble/include \
  	$(IDF_PATH)/components/bt/host/nimble/nimble/porting/npl/freertos/include \
  	$(IDF_PATH)/components/bt/host/nimble/port/include \
+        $(IDF_PATH)/components/soc/$(ESP32_SUBCLASS) \
  	$(IDF_PATH)/components/soc/$(ESP32_SUBCLASS)/include \
+	$(IDF_PATH)/components/soc/$(ESP32_SUBCLASS)/include/soc \
  	$(IDF_PATH)/components/soc/include \
  	$(IDF_PATH)/components/soc/include/soc \
  	$(IDF_PATH)/components/spiffs/include \
@@ -145,9 +155,7 @@ INC_DIRS = \
  	$(IDF_PATH)/components/tcpip_adapter/include \
  	$(IDF_PATH)/components/tcpip_adapter \
  	$(IDF_PATH)/components/vfs/include
-
-# 	$(IDF_PATH)/components/$(ESP32_SUBCLASS)/include \
-    
+	
 XS_OBJ = \
 	$(LIB_DIR)/xsAll.c.o \
 	$(LIB_DIR)/xsAPI.c.o \
@@ -208,12 +216,13 @@ XS_HEADERS = \
 	$(XS_DIR)/platforms/esp/xsPlatform.h
 HEADERS += $(XS_HEADERS)
 
-CC  = xtensa-$(ESP32_SUBCLASS)-elf-gcc
-CPP = xtensa-$(ESP32_SUBCLASS)-elf-g++
-LD  = $(CPP)
-AR  = xtensa-$(ESP32_SUBCLASS)-elf-ar
-OBJCOPY = xtensa-$(ESP32_SUBCLASS)-elf-objcopy
-OBJDUMP = xtensa-$(ESP32_SUBCLASS)-elf-objdump
+CC = $(GXX_PREFIX)-elf-gcc
+CPP = $(GXX_PREFIX)-elf-g++
+LD = $(CPP)
+AR = $(GXX_PREFIX)-elf-ar
+OBJCOPY = $(GXX_PREFIX)-elf-objcopy
+OBJDUMP = $(GXX_PREFIX)-elf-objdump
+
 ESPTOOL = $(IDF_PATH)/components/esptool_py/esptool/esptool.py
 
 AR_FLAGS = crs
@@ -262,8 +271,6 @@ C_COMMON_FLAGS ?= -c -Os -g \
 	-Wl,-EL \
 	-fno-inline-functions \
 	-nostdlib \
-	-mlongcalls \
-	-mtext-section-literals \
 	-falign-functions=4 \
 	-MMD \
 	-fdata-sections \
@@ -275,6 +282,12 @@ C_COMMON_FLAGS ?= -c -Os -g \
 	-D BOOTLOADER_BUILD=1 \
 	-DESP_PLATFORM \
 	-MP
+
+ifneq ("$(ESP_ARCH)","riscv")
+C_COMMON_FLAGS +=	\
+ 	-mlongcalls \
+	-mtext-section-literals
+endif
 
 C_FLAGS ?= $(C_COMMON_FLAGS) \
 	-Wno-implicit-function-declaration \
@@ -336,11 +349,11 @@ ifeq ($(DEBUG),1)
 	ifeq ($(HOST_OS),Darwin)
 		KILL_SERIAL_2_XSBUG = $(shell pkill serial2xsbug)
 		DO_XSBUG = open -a $(BUILD_DIR)/bin/mac/release/xsbug.app -g
-		DO_LAUNCH = bash -c "serial2xsbug $(SERIAL2XSBUG_PORT) $(DEBUGGER_SPEED) 8N1 -elf $(PROJ_DIR)/build/xs_esp32.elf -bin xtensa-$(ESP32_SUBCLASS)-elf-gdb"
+		DO_LAUNCH = bash -c "XSBUG_PORT=$(XSBUG_PORT) XSBUG_HOST=$(XSBUG_HOST) serial2xsbug $(SERIAL2XSBUG_PORT) $(DEBUGGER_SPEED) 8N1 -elf $(PROJ_DIR)/build/xs_esp32.elf -bin $(GXX_PREFIX)-elf-gdb"
 	else
 		KILL_SERIAL_2_XSBUG = $(shell pkill serial2xsbug)
 		DO_XSBUG = $(shell nohup $(BUILD_DIR)/bin/lin/release/xsbug > /dev/null 2>&1 &)
-		DO_LAUNCH = bash -c "serial2xsbug $(SERIAL2XSBUG_PORT) $(DEBUGGER_SPEED) 8N1"
+		DO_LAUNCH = bash -c "XSBUG_PORT=$(XSBUG_PORT) XSBUG_HOST=$(XSBUG_HOST) serial2xsbug $(SERIAL2XSBUG_PORT) $(DEBUGGER_SPEED) 8N1"
 	endif
 else
 	KILL_SERIAL_2_XSBUG = 

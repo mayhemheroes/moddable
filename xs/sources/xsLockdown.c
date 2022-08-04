@@ -1,4 +1,41 @@
-#include "xsAll.h"		//@@ add copyright notice!
+/*
+ * Copyright (c) 2020-2022  Moddable Tech, Inc.
+ *
+ *   This file is part of the Moddable SDK Runtime.
+ * 
+ *   The Moddable SDK Runtime is free software: you can redistribute it and/or modify
+ *   it under the terms of the GNU Lesser General Public License as published by
+ *   the Free Software Foundation, either version 3 of the License, or
+ *   (at your option) any later version.
+ * 
+ *   The Moddable SDK Runtime is distributed in the hope that it will be useful,
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *   GNU Lesser General Public License for more details.
+ * 
+ *   You should have received a copy of the GNU Lesser General Public License
+ *   along with the Moddable SDK Runtime.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * This file incorporates work covered by the following copyright and  
+ * permission notice:  
+ *
+ *       Copyright (C) 2010-2016 Marvell International Ltd.
+ *       Copyright (C) 2002-2010 Kinoma, Inc.
+ *
+ *       Licensed under the Apache License, Version 2.0 (the "License");
+ *       you may not use this file except in compliance with the License.
+ *       You may obtain a copy of the License at
+ *
+ *        http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *       Unless required by applicable law or agreed to in writing, software
+ *       distributed under the License is distributed on an "AS IS" BASIS,
+ *       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *       See the License for the specific language governing permissions and
+ *       limitations under the License.
+ */
+
+#include "xsAll.h"
 #include "xsScript.h"
 
 void fxSetHostFunctionProperty(txMachine* the, txSlot* property, txCallback call, txInteger length, txID id)
@@ -585,9 +622,7 @@ void fxVerifyError(txMachine* the, txSlot* path, txID id, txIndex index, txStrin
 {
 	txSlot* array;
 	txSlot* slot;
-	txSlot* current;
-	txSlot* next;
-	txSlot* previous;
+	txSlot* stack;
 	
 	array = mxResult->value.reference->next;
 	slot = fxNewSlot(the);
@@ -596,38 +631,55 @@ void fxVerifyError(txMachine* the, txSlot* path, txID id, txIndex index, txStrin
 	array->value.array.length++;
 	fxString(the, slot, "");
 	
-	current = path;
-	next = C_NULL;
-	previous = C_NULL;
-	while (current) {
-		next = current->next;
-		current->next = previous;
-		previous = current;
-		current = next;
+	stack = the->stack;
+	while (path) {
+		mxPushSlot(path);
+		path = path->next;
 	}
-	
-	path = previous;
-	current = path;
-	while (current) {
-		if (current->kind == XS_STRING_X_KIND) {
-			fxVerifyErrorString(the, slot, XS_NO_ID, 0, current->value.string);
+	while (the->stack < stack) {
+		if (the->stack->kind == XS_STRING_X_KIND) {
+			fxVerifyErrorString(the, slot, XS_NO_ID, 0, the->stack->value.string);
 		}
 		else {
-			fxVerifyErrorString(the, slot, current->value.at.id, current->value.at.index, C_NULL);
+			fxVerifyErrorString(the, slot, the->stack->value.at.id, the->stack->value.at.index, C_NULL);
 		}
-		current = current->next;
+		mxPop();
 	}
 	fxVerifyErrorString(the, slot, id, index, string);
 	
-	current = path;
-	next = C_NULL;
-	previous = C_NULL;
-	while (current) {
-		next = current->next;
-		current->next = previous;
-		previous = current;
-		current = next;
-	}
+	
+// 	current = path;
+// 	next = C_NULL;
+// 	previous = C_NULL;
+// 	while (current) {
+// 		next = current->next;
+// 		current->next = previous;
+// 		previous = current;
+// 		current = next;
+// 	}
+// 	
+// 	path = previous;
+// 	current = path;
+// 	while (current) {
+// 		if (current->kind == XS_STRING_X_KIND) {
+// 			fxVerifyErrorString(the, slot, XS_NO_ID, 0, current->value.string);
+// 		}
+// 		else {
+// 			fxVerifyErrorString(the, slot, current->value.at.id, current->value.at.index, C_NULL);
+// 		}
+// 		current = current->next;
+// 	}
+// 	fxVerifyErrorString(the, slot, id, index, string);
+// 	
+// 	current = path;
+// 	next = C_NULL;
+// 	previous = C_NULL;
+// 	while (current) {
+// 		next = current->next;
+// 		current->next = previous;
+// 		previous = current;
+// 		current = next;
+// 	}
 }
 
 void fxVerifyErrorString(txMachine* the, txSlot* slot, txID id, txIndex index, txString string)
@@ -845,6 +897,9 @@ void fxVerifyQueue(txMachine* the, txSlot* list, txSlot* path, txSlot* instance,
 	if (instance->flag & XS_LEVEL_FLAG)
 		return;
 	item = fxNewSlot(the);
+	item->value.list.first = C_NULL;
+	item->value.list.last = instance;
+	item->kind = XS_LIST_KIND;
 	list->value.list.last->next = item;
 	list->value.list.last = item;
 	
@@ -859,6 +914,4 @@ void fxVerifyQueue(txMachine* the, txSlot* list, txSlot* path, txSlot* instance,
 		name->kind = XS_AT_KIND;
 	}
 	name->next = path;
-	item->value.list.last = instance;
-	item->kind = XS_LIST_KIND;
 }

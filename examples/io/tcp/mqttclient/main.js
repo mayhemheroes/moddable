@@ -12,10 +12,11 @@
  *
  */
 
-import MQTTClient from "embedded:network/mqtt/client";
 import Timer from "timer";
 
+const MQTTClient = device.network.mqtt.io;
 const mqtt = new MQTTClient({
+	...device.network.mqtt,
 	host: "test.mosquitto.org",
 	port: 1883,
 	id: "ecma-419 mqtt test",

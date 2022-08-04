@@ -916,6 +916,8 @@ txU4 fxSumEntry(txMachine* the, txSlot* slot)
 		else if (XS_NUMBER_KIND == kind) {
 			if (slot->value.number == 0)
 				slot->value.number = 0;
+			else if (c_isnan(slot->value.number))
+				slot->value.number = C_NAN;
 			sum = *((txU8*)&slot->value.number);
 		}
 		else if ((XS_BIGINT_KIND == kind) || (XS_BIGINT_X_KIND == kind)) {
@@ -1229,6 +1231,7 @@ txBoolean fxDeleteWeakEntry(txMachine* the, txSlot* list, txSlot* key)
 		if (!(slot->flag & XS_INTERNAL_FLAG))
 			break;
 		if ((slot->kind == XS_WEAK_ENTRY_KIND) && (slot->value.weakEntry.check == list)) {
+			slot->value.weakEntry.value->kind = XS_UNINITIALIZED_KIND;
 			*address = slot->next;
 			return 1;
 		}			
@@ -1257,6 +1260,7 @@ void fxSetWeakEntry(txMachine* the, txSlot* list, txSlot* key, txSlot* value)
 	txSlot** address = &slot->next;
 	txSlot* keyEntry;
 	txSlot* listEntry;
+	txSlot* closure;
 	while ((slot = *address)) {
 		if (!(slot->flag & XS_INTERNAL_FLAG))
 			break;
@@ -1268,26 +1272,35 @@ void fxSetWeakEntry(txMachine* the, txSlot* list, txSlot* key, txSlot* value)
 		}			
 		address = &slot->next;
 	}
+	
 	keyEntry = fxNewSlot(the);
 	mxPushClosure(keyEntry);
 	listEntry = fxNewSlot(the);
 	mxPushClosure(listEntry);
-	slot = fxNewSlot(the);
-	slot->kind = value->kind;
-	slot->value = value->value;
+	closure = fxNewSlot(the);
+	closure->kind = value->kind;
+	closure->value = value->value;
+	
+	slot = (key->flag & XS_EXOTIC_FLAG) ? key->next : key;
+	address = &slot->next;
+	while ((slot = *address)) {
+		if (!(slot->flag & XS_INTERNAL_FLAG))
+			break;
+		address = &slot->next;
+	}
 	
 	keyEntry->next = *address;
 	keyEntry->flag = XS_INTERNAL_FLAG;
 	keyEntry->kind = XS_WEAK_ENTRY_KIND;
 	keyEntry->value.weakEntry.check = list;
-	keyEntry->value.weakEntry.value = slot;
+	keyEntry->value.weakEntry.value = closure;
 	*address = keyEntry;
 	
 	listEntry->next = list->value.weakList.first;
 	listEntry->flag = XS_INTERNAL_FLAG;
 	listEntry->kind = XS_WEAK_ENTRY_KIND;
 	listEntry->value.weakEntry.check = key;
-	listEntry->value.weakEntry.value = slot;
+	listEntry->value.weakEntry.value = closure;
 	list->value.weakList.first = listEntry;
 	
 	mxPop();

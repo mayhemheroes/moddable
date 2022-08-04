@@ -546,7 +546,7 @@ void fxBuildHosts(txMachine* the, txInteger c, const txHostFunctionBuilder* buil
 			mxPushUndefined();
 			the->stack->kind = XS_HOST_FUNCTION_KIND;
 			the->stack->value.hostFunction.builder = builder;
-			the->stack->value.hostFunction.IDs = (txID*)(the->code);
+			the->stack->value.hostFunction.IDs = C_NULL;
 		#else
 			fxNewHostFunction(the, builder->callback, builder->length, (the->code && (builder->id)) ? ((txID*)(the->code))[builder->id] : builder->id);
 		#endif
@@ -2209,7 +2209,6 @@ void* fxMapArchive(txMachine* the, txPreparation* preparation, void* archive, si
 	Atom atom;
 	txU1* p;
 	txU1* q;
-	txU1* signature;
 	txID id;
 	txID c, i;
 	txFlag clean;
@@ -2246,7 +2245,6 @@ void* fxMapArchive(txMachine* the, txPreparation* preparation, void* archive, si
 		mxMapAtom(p);
 		mxElseFatalCheck(atom.atomType == XS_ATOM_SIGNATURE);
 		mxElseFatalCheck(atom.atomSize == sizeof(Atom) + XS_DIGEST_SIZE);
-		signature = p;
 		p += XS_DIGEST_SIZE;
 		
 		self->bufferOffset = mxArchiveHeaderSize;

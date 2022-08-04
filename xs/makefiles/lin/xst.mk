@@ -31,6 +31,7 @@ BUILD_DIR ?= $(realpath ../../../build)
 
 FUZZILLI ?= 0
 OSSFUZZ ?= 0
+OSSFUZZ_JSONPARSE ?= 0
 FUZZING ?= 0
 
 BIN_DIR = $(BUILD_DIR)/bin/lin/$(GOAL)
@@ -57,6 +58,7 @@ C_OPTIONS = \
 	-DmxSnapshot=1 \
 	-DmxRegExpUnicodePropertyEscapes=1 \
 	-DmxStringNormalize=1 \
+	-DmxMinusZero=1 \
 	-I$(INC_DIR) \
 	-I$(PLT_DIR) \
 	-I$(SRC_DIR) \
@@ -79,6 +81,9 @@ ifeq ($(GOAL),debug)
 		C_OPTIONS += -DOSSFUZZ=1
 		C_OPTIONS += $(CFLAGS)
 		LINK_OPTIONS += $(CXXFLAGS)
+		ifneq ($(OSSFUZZ_JSONPARSE),0)
+			C_OPTIONS += -DOSSFUZZ_JSONPARSE=1
+		endif
 	endif
 	ifneq ($(FUZZILLI),0)
 		C_OPTIONS += -DFUZZILLI=1 -fsanitize-coverage=trace-pc-guard

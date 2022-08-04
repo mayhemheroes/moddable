@@ -1,18 +1,11 @@
 {
 	"include": [
-		"$(MODDABLE)/modules/io/manifest.json"
+		"$(MODDABLE)/examples/io/tcp/fetch/manifest_fetch.json"
 	],
 	"creation": {
 		"static": 65536
 	},
 	"modules": {
-		"*": [
-			"./fetch",
-			"./main"
-		],
-		"embedded:network/http/request": "./../httpclient/httpclient"
-	},
-	"preload": [
-		"embedded:network/http/request"
-	]
+		"*": "./main"
+	}
 }

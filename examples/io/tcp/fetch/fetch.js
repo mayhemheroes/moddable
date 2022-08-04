@@ -18,7 +18,6 @@
  *
  */
  
-import HTTPRequest from "embedded:network/http/request";
 
 let urlRegExp = null;
 function URLParts(url) {
@@ -35,8 +34,9 @@ function URLParts(url) {
 }
 
 let authorityRegExp = null;
-const clients = new Map();
+let clients;
 function Client(authority) {
+	clients ??= new Map;
 	let client = clients.get(authority);
 	if (!client) {
 		if (!authorityRegExp)
@@ -44,7 +44,8 @@ function Client(authority) {
 		const authorityParts = authority.match(authorityRegExp);
 		const host = authorityParts[1];
 		const port = authorityParts[3] ?? 80;
-		client = new HTTPRequest({ 
+		client = new device.network.http.io({ 
+			...device.network.http,
 			host, 
 			port,  
 			onClose() {
@@ -99,6 +100,7 @@ const statusTexts = {
 	504: "Gateway Timeout",
 	505: "HTTP Version Not Supported",
 };
+Object.freeze(statusTexts);
 
 class Headers extends Map {
 	delete(key) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2017  Moddable Tech, Inc.
+ * Copyright (c) 2016-2022  Moddable Tech, Inc.
  *
  *   This file is part of the Moddable SDK Runtime.
  * 
@@ -44,8 +44,10 @@
 	#define mx_dtoa 1
 #endif
 #if __GNUC__ >= 5
-	#undef __has_builtin
-	#define __has_builtin(x) 1
+	#if ESP32
+		#undef __has_builtin
+		#define __has_builtin(x) 1
+	#endif
 #elif !defined(__has_builtin)
 	#define __has_builtin(x) 0
 #endif
@@ -101,8 +103,8 @@ typedef struct {
 #define XS_ATOM_SIGNATURE 0x5349474E /* 'SIGN' */
 #define XS_ATOM_SYMBOLS 0x53594D42 /* 'SYMB' */
 #define XS_ATOM_VERSION 0x56455253 /* 'VERS' */
-#define XS_MAJOR_VERSION 11
-#define XS_MINOR_VERSION 9
+#define XS_MAJOR_VERSION 13
+#define XS_MINOR_VERSION 0
 #define XS_PATCH_VERSION 0
 
 #define XS_DIGEST_SIZE 16
@@ -240,6 +242,8 @@ enum {
 	XS_CODE_GET_THIS_VARIABLE,
 	XS_CODE_GET_VARIABLE,
 	XS_CODE_GLOBAL,
+	XS_CODE_HAS_PRIVATE_1,
+	XS_CODE_HAS_PRIVATE_2,
 	XS_CODE_HOST,
 	XS_CODE_IMPORT,
 	XS_CODE_IMPORT_META,
@@ -780,6 +784,7 @@ enum {
 	_callee,
 	_caller,
 	_catch,
+	_cause,
 	_cbrt,
 	_ceil,
 	_center,
@@ -896,6 +901,7 @@ enum {
 	_has,
 	_hasIndices,
 	_hasInstance,
+	_hasOwn,
 	_hasOwnProperty,
 	_hypot_,
 	_id,

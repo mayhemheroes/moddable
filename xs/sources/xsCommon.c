@@ -147,6 +147,8 @@ const txString gxCodeNames[XS_CODE_COUNT] = {
 	/* XS_CODE_GET_THIS_VARIABLE */ "get_this_variable",
 	/* XS_CODE_GET_VARIABLE */ "get_variable",
 	/* XS_CODE_GLOBAL */ "global",
+	/* XS_CODE_HAS_PRIVATE_1 */ "has_private",
+	/* XS_CODE_HAS_PRIVATE_2 */ "has_private_2",
 	/* XS_CODE_HOST */ "host",
 	/* XS_CODE_IMPORT */ "import",
 	/* XS_CODE_IMPORT_META */ "import.meta",
@@ -384,6 +386,8 @@ const txS1 gxCodeSizes[XS_CODE_COUNT] ICACHE_FLASH_ATTR = {
 	0 /* XS_CODE_GET_THIS_VARIABLE */,
 	0 /* XS_CODE_GET_VARIABLE */,
 	1 /* XS_CODE_GLOBAL */,
+	2 /* XS_CODE_HAS_PRIVATE_1 */,
+	3 /* XS_CODE_HAS_PRIVATE_2 */,
 	3 /* XS_CODE_HOST */,
 	1 /* XS_CODE_IMPORT */,
 	1 /* XS_CODE_IMPORT_META */,
@@ -1098,6 +1102,11 @@ txSize fxUnicodeLength(txString theString)
 
 #define ONEMASK ((size_t)(-1) / 0xFF)
 
+#if defined(__has_feature)
+	#if __has_feature(address_sanitizer)
+		__attribute__((no_sanitize("address"))) 
+	#endif
+#endif
 txSize fxUnicodeLength(txString _s)
 {
 	const char * s;
@@ -1353,6 +1362,7 @@ const txString gxIDStrings[XS_ID_COUNT] = {
 	"callee",
 	"caller",
 	"catch",
+	"cause",
 	"cbrt",
 	"ceil",
 	"center",
@@ -1469,6 +1479,7 @@ const txString gxIDStrings[XS_ID_COUNT] = {
 	"has",
 	"hasIndices",
 	"hasInstance",
+	"hasOwn",
 	"hasOwnProperty",
 	"hypot",
 	"id",

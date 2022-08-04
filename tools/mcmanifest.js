@@ -362,6 +362,9 @@ export class MakeFile extends FILE {
 		this.line("TMP_DIR = ", tool.tmpPath);
 		this.line("LIB_DIR = ", tool.libPath);
 		this.line("XS_DIR = ", tool.xsPath);
+		this.line("XSBUG_HOST = ", tool.xsbug?.host ?? "localhost");
+		this.line("XSBUG_PORT = ", tool.xsbug?.port ?? 5002);
+		
 		this.line("");
 
 		this.generateManifestDefinitions(tool);
@@ -1481,6 +1484,19 @@ export class Tool extends TOOL {
 				else
 					this.buildTarget = this.buildTarget + " " + argv[argi];
 				break;
+			case "-x":
+				argi++;
+				if (argi >= argc)
+					throw new Error("-x: no host");
+				name = argv[argi];
+				if (undefined !== this.xsbug)
+					throw new Error("-x '" + name + "': only one!");
+				name = name.split(":");
+				this.xsbug = {
+					host: name[0],
+					port: name[1]
+				};
+				break;
 			default:
 				name = argv[argi];
 				let split = name.split("=");
@@ -1749,8 +1765,11 @@ export class Tool extends TOOL {
 				if (platformInclude) {
 					if (!("include" in manifest))
 						manifest.include = platformInclude;
-					else
-						manifest.include = manifest.include.concat(manifest.include, platformInclude);
+					else {
+						if ("string" === typeof manifest.include)
+							manifest.include = [manifest.include];
+						manifest.include = manifest.include.concat(platformInclude);
+					}
 				}
 			}
 		}

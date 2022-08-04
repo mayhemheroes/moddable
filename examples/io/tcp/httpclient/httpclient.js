@@ -18,7 +18,6 @@
  *
  */
  
-import TCP from "embedded:io/socket/tcp";
 import Timer from "timer";
 
 class HTTPClient {
@@ -135,23 +134,29 @@ class HTTPClient {
 		this.#host = host;
 		this.#onClose = onClose;
 
-		System.resolve(this.#host, (host, address) => {
-			if (!address)
-				return this.#onError?.();
+		const dns = new options.dns.io(options.dns);
+		dns.resolve({
+			host: this.#host, 
 
-			this.#socket = new TCP({
-				address,
-				port: port ?? 80,
-				onReadable: this.#onReadable.bind(this),
-				onWritable: this.#onWritable.bind(this),
-				onError: this.#onError.bind(this)
-			});
+			onResolved: (host, address) => {
+				this.#socket = new options.socket.io({
+					...options.socket,
+					address,
+					port: port ?? 80,
+					onReadable: this.#onReadable.bind(this),
+					onWritable: this.#onWritable.bind(this),
+					onError: this.#onError.bind(this)
+				});
+			},
+			onError: () => {
+				this.#onError?.();
+			}
 		});
 	}
 	close() {
 		this.#socket?.close();
 		this.#socket = undefined;
-			Timer.clear(this.#timer);
+		Timer.clear(this.#timer);
 		this.#timer = undefined;
 	}
 	request(options) {
@@ -283,7 +288,7 @@ class HTTPClient {
 						break;
 				
 				case "sendRequest":
-					this.#pendingWrite = (this.#current.method ?? "GET") + " " + (this.#current.path ?? "/") + " HTTP/1.1\r\n";
+					this.#pendingWrite = (this.#current.method ?? "GET") + " " + (this.#current.path || "/") + " HTTP/1.1\r\n";
 					this.#pendingWrite += "host: " + this.#host + "\r\n";
 					this.#pendingWrite = ArrayBuffer.fromString(this.#pendingWrite);
 					this.#writePosition = 0;

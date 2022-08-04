@@ -109,7 +109,7 @@
 			#define mxImport extern
 		#endif
 
-		#if defined(__ets__)
+		#if defined(__ets__) && !ESP32
 			typedef uint32_t size_t; 
 		#endif
 	#else 
@@ -1304,6 +1304,7 @@ typedef unsigned char xsAttribute;
 		XS_IMPORT_NAMESPACE = 0,
 		XS_IMPORT_DEFAULT = 1,
 		XS_IMPORT_PREFLIGHT = 2,
+		XS_IMPORT_ASYNC = 4,
 	};
 #endif
 
